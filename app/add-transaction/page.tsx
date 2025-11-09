@@ -105,8 +105,13 @@ export default function AddTransactionPage() {
         type,
       })
 
-      // Navigate back to home
-      router.push('/')
+      // Clear form fields and stay on page (keep date for batch entry)
+      setAmount('')
+      setDescription('')
+
+      // Show success message briefly
+      setError('✓ Transaction added successfully!')
+      setTimeout(() => setError(null), 3000)
     } catch (err: any) {
       console.error('Failed to save transaction', err)
       setError(err?.message || 'Failed to save transaction')
@@ -153,8 +158,16 @@ export default function AddTransactionPage() {
         </div>
 
         {error && (
-          <div className="mb-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md">
-            <p className="text-red-700 dark:text-red-400 text-sm">{error}</p>
+          <div className={`mb-4 p-3 rounded-md ${
+            error.startsWith('✓')
+              ? 'bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800'
+              : 'bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800'
+          }`}>
+            <p className={`text-sm ${
+              error.startsWith('✓')
+                ? 'text-green-700 dark:text-green-400'
+                : 'text-red-700 dark:text-red-400'
+            }`}>{error}</p>
           </div>
         )}
 
