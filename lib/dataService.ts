@@ -220,15 +220,17 @@ export async function getDefaultCurrency(userId: number): Promise<Currency | nul
   return await getCurrencyById(settings.default_currency_id)
 }
 
-// Analytics
+// Analytics (exclude Opening Balance from calculations)
 export async function getIncomeAndExpenseForPeriod(userId: number, startDate: string, endDate: string) {
   const results = await query<any[]>(
     `SELECT
-      type,
-      COALESCE(SUM(amount), 0) as total
-    FROM transactions
-    WHERE user_id = ? AND transaction_date >= ? AND transaction_date <= ?
-    GROUP BY type`,
+      t.type,
+      COALESCE(SUM(t.amount), 0) as total
+    FROM transactions t
+    JOIN categories c ON t.category_id = c.id
+    WHERE t.user_id = ? AND t.transaction_date >= ? AND t.transaction_date <= ?
+      AND c.name != 'Opening Balance'
+    GROUP BY t.type`,
     [userId, startDate, endDate]
   )
 
@@ -246,6 +248,7 @@ export async function getSpendingByCategory(userId: number, startDate: string, e
     FROM transactions t
     JOIN categories c ON t.category_id = c.id
     WHERE t.user_id = ? AND t.type = 'expense' AND t.transaction_date >= ? AND t.transaction_date <= ?
+      AND c.name != 'Opening Balance'
     GROUP BY c.id, c.name
     ORDER BY amount DESC`,
     [userId, startDate, endDate]
@@ -260,6 +263,7 @@ export async function getIncomeByCategory(userId: number, startDate: string, end
     FROM transactions t
     JOIN categories c ON t.category_id = c.id
     WHERE t.user_id = ? AND t.type = 'income' AND t.transaction_date >= ? AND t.transaction_date <= ?
+      AND c.name != 'Opening Balance'
     GROUP BY c.id, c.name
     ORDER BY amount DESC`,
     [userId, startDate, endDate]

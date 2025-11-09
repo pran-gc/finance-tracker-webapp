@@ -148,6 +148,7 @@ INSERT IGNORE INTO categories (name, type, is_active) VALUES
   ('Miscellaneous', 'expense', TRUE),
 
   -- Income Categories
+  ('Opening Balance', 'income', TRUE),
   ('Salary', 'income', TRUE),
   ('Bonus', 'income', TRUE),
   ('Freelance', 'income', TRUE),

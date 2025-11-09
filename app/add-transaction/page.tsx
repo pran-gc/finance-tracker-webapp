@@ -134,6 +134,24 @@ export default function AddTransactionPage() {
           <p className="text-sm text-zinc-600 dark:text-zinc-400 mt-1">Record a new income or expense</p>
         </div>
 
+        {/* Opening Balance Info Box */}
+        <div className="mb-6 p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+          <div className="flex items-start gap-3">
+            <svg className="w-5 h-5 text-blue-600 dark:text-blue-400 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <div>
+              <h3 className="text-sm font-semibold text-blue-900 dark:text-blue-100 mb-1">Setting Your Opening Balance</h3>
+              <p className="text-sm text-blue-800 dark:text-blue-200">
+                To match your current bank balance, add an <strong>"Opening Balance"</strong> income transaction dated at the start of your tracking period.
+              </p>
+              <p className="text-xs text-blue-700 dark:text-blue-300 mt-2">
+                Formula: Opening Balance = Current Bank Balance - (Last Month Income - Expenses)
+              </p>
+            </div>
+          </div>
+        </div>
+
         {error && (
           <div className="mb-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md">
             <p className="text-red-700 dark:text-red-400 text-sm">{error}</p>
