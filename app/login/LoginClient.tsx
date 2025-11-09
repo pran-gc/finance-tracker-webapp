@@ -27,7 +27,7 @@ export default function LoginClient() {
     <div className="min-h-screen relative flex items-center overflow-hidden bg-zinc-100 dark:bg-zinc-900">
       {/* Background Image */}
       <img
-        src="/images/financeapp.jpg"
+        src="https://cdn.pixabay.com/photo/2018/02/08/10/22/desk-3139127_1280.jpg"
         alt="Finance background"
         className="absolute inset-0 w-full h-full object-cover"
       />
