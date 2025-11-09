@@ -8,6 +8,7 @@ import { ThemeProvider } from "next-themes";
 import "./globals.css";
 import AutoSyncClient from '@/components/auto-sync-client'
 import AuthGate from '@/components/auth-gate'
+import { CurrencyProvider } from '@/contexts/CurrencyContext'
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -59,9 +60,11 @@ export default function RootLayout({
           defaultTheme="system"
           disableTransitionOnChange
         >
-          <AuthGate />
-          <AutoSyncClient />
-          {children}
+          <CurrencyProvider>
+            <AuthGate />
+            <AutoSyncClient />
+            {children}
+          </CurrencyProvider>
         </ThemeProvider>
       </body>
     </html>

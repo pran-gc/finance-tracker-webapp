@@ -4,16 +4,19 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Page from '@/components/page'
 import Section from '@/components/section'
-import { initDB } from '@/lib/db'
-import { getCategories, addTransaction, seedCategories, getDefaultCurrency } from '@/lib/data'
-import { isSignedIn } from '@/lib/googleDrive'
-import { syncService } from '@/lib/sync'
+import { categoriesApi, transactionsApi, settingsApi } from '@/lib/api'
+
+interface Category {
+  id: number
+  name: string
+  type: 'income' | 'expense'
+}
 
 export default function AddTransactionPage() {
   const router = useRouter()
-  const [dbReady, setDbReady] = useState(false)
-  const [allCategories, setAllCategories] = useState<Array<any>>([])
-  const [categories, setCategories] = useState<Array<any>>([])
+  const [loading, setLoading] = useState(true)
+  const [allCategories, setAllCategories] = useState<Category[]>([])
+  const [categories, setCategories] = useState<Category[]>([])
   const [type, setType] = useState<'expense' | 'income'>('expense')
   const [categoryId, setCategoryId] = useState<number | null>(null)
   const [amount, setAmount] = useState<string>('')
@@ -27,34 +30,36 @@ export default function AddTransactionPage() {
     let mounted = true
 
     async function prepare() {
-      await initDB()
-
-      // Ensure categories exist (seed if empty)
-      let cats = await getCategories()
-      if (cats.length === 0) {
-        await seedCategories()
-        cats = await getCategories()
-      }
-
-      // Deduplicate categories by name (some environments may have seeded twice)
-      const uniqueByName = Array.from(
-        new Map(cats.map((c: any) => [String(c.name).trim(), c])).values()
-      )
-
-  if (!mounted) return
-  setAllCategories(uniqueByName)
-  // apply initial filter by current type (initial)
-  const filtered = uniqueByName.filter((c: any) => c.type === type)
-  setCategories(filtered)
-  setCategoryId(filtered[0]?.id ?? null)
-      // load default currency symbol
       try {
-        const def = await getDefaultCurrency()
-        if (def && def.symbol) setCurrencySymbol(def.symbol)
-      } catch (e) {
-        // ignore
+        // Load categories and settings in parallel
+        const [categoriesResponse, settingsResponse] = await Promise.all([
+          categoriesApi.getAll(),
+          settingsApi.get()
+        ])
+
+        if (!mounted) return
+
+        setAllCategories(categoriesResponse.categories)
+
+        // Filter by initial type
+        const filtered = categoriesResponse.categories.filter((c: Category) => c.type === type)
+        setCategories(filtered)
+        setCategoryId(filtered[0]?.id ?? null)
+
+        // Set currency symbol
+        if (settingsResponse.defaultCurrency?.symbol) {
+          setCurrencySymbol(settingsResponse.defaultCurrency.symbol)
+        }
+      } catch (err: any) {
+        console.error('Failed to load data:', err)
+        if (err.message?.includes('Unauthorized')) {
+          router.push('/login')
+        } else {
+          setError(err.message || 'Failed to load data')
+        }
+      } finally {
+        setLoading(false)
       }
-      setDbReady(true)
     }
 
     prepare()
@@ -62,17 +67,17 @@ export default function AddTransactionPage() {
     return () => {
       mounted = false
     }
-  }, [])
+  }, [router, type])
 
-  // Update visible categories whenever the selected type or allCategories change
+  // Update visible categories whenever the selected type changes
   useEffect(() => {
-    const filtered = allCategories.filter((c: any) => c.type === type)
+    const filtered = allCategories.filter((c) => c.type === type)
     setCategories(filtered)
     // if the currently selected category is not in filtered list, pick the first
-    if (!filtered.find((c: any) => c.id === categoryId)) {
+    if (!filtered.find((c) => c.id === categoryId)) {
       setCategoryId(filtered[0]?.id ?? null)
     }
-  }, [type, allCategories])
+  }, [type, allCategories, categoryId])
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -92,24 +97,15 @@ export default function AddTransactionPage() {
     setSaving(true)
 
     try {
-      await addTransaction({
+      await transactionsApi.create({
         category_id: Number(categoryId),
         amount: parsedAmount,
-        description: description || '',
+        description: description || undefined,
         transaction_date: transactionDate,
         type,
       })
 
-        // If signed in, back up to Drive to keep cloud copy as source-of-truth
-        try {
-          if (await isSignedIn()) {
-            await syncService.backupToDrive()
-          }
-        } catch (backupErr) {
-          console.warn('Backup after transaction failed', backupErr)
-        }
-
-      // Brief confirmation then navigate back
+      // Navigate back to home
       router.push('/')
     } catch (err: any) {
       console.error('Failed to save transaction', err)
@@ -119,12 +115,12 @@ export default function AddTransactionPage() {
     }
   }
 
-  if (!dbReady) {
+  if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-500 mx-auto mb-4"></div>
-          <p className="text-zinc-600 dark:text-zinc-400">Preparing data…</p>
+          <p className="text-zinc-600 dark:text-zinc-400">Loading...</p>
         </div>
       </div>
     )
@@ -133,23 +129,40 @@ export default function AddTransactionPage() {
   return (
     <Page>
       <Section>
-        <h1 className="text-2xl font-bold mb-4">Add Transaction</h1>
+        <div className="mb-6">
+          <h1 className="text-2xl font-bold text-zinc-900 dark:text-zinc-100">Add Transaction</h1>
+          <p className="text-sm text-zinc-600 dark:text-zinc-400 mt-1">Record a new income or expense</p>
+        </div>
 
-        <form onSubmit={onSubmit} className="space-y-4">
+        {error && (
+          <div className="mb-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md">
+            <p className="text-red-700 dark:text-red-400 text-sm">{error}</p>
+          </div>
+        )}
+
+        <form onSubmit={onSubmit} className="space-y-5">
           <div>
-            <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">Type</label>
-            <div className="flex space-x-2">
+            <label className="block text-sm font-semibold text-zinc-700 dark:text-zinc-300 mb-2">Type</label>
+            <div className="flex gap-3">
               <button
                 type="button"
                 onClick={() => setType('expense')}
-                className={`px-3 py-2 rounded-md ${type === 'expense' ? 'bg-indigo-600 text-white' : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300'}`}
+                className={`flex-1 px-4 py-3 rounded-lg font-medium transition-all ${
+                  type === 'expense'
+                    ? 'bg-red-600 text-white shadow-md'
+                    : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-200 dark:hover:bg-zinc-700'
+                }`}
               >
                 Expense
               </button>
               <button
                 type="button"
                 onClick={() => setType('income')}
-                className={`px-3 py-2 rounded-md ${type === 'income' ? 'bg-indigo-600 text-white' : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300'}`}
+                className={`flex-1 px-4 py-3 rounded-lg font-medium transition-all ${
+                  type === 'income'
+                    ? 'bg-green-600 text-white shadow-md'
+                    : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-200 dark:hover:bg-zinc-700'
+                }`}
               >
                 Income
               </button>
@@ -157,11 +170,12 @@ export default function AddTransactionPage() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">Category</label>
+            <label className="block text-sm font-semibold text-zinc-700 dark:text-zinc-300 mb-2">Category</label>
             <select
               value={categoryId ?? ''}
               onChange={(e) => setCategoryId(Number(e.target.value))}
-              className="w-full rounded-md border border-zinc-200 dark:border-zinc-700 px-3 py-2 bg-white dark:bg-zinc-900"
+              className="w-full rounded-lg border border-zinc-300 dark:border-zinc-600 px-4 py-3 bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
+              required
             >
               {categories.map((c) => (
                 <option key={c.id} value={c.id}>
@@ -172,53 +186,57 @@ export default function AddTransactionPage() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">Amount</label>
+            <label className="block text-sm font-semibold text-zinc-700 dark:text-zinc-300 mb-2">Amount</label>
             <div className="relative">
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-600">{currencySymbol}</span>
+              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-600 dark:text-zinc-400 font-medium">{currencySymbol}</span>
               <input
                 type="number"
                 step="0.01"
                 value={amount}
                 onChange={(e) => setAmount(e.target.value)}
                 placeholder="0.00"
-                className="w-full rounded-md border border-zinc-200 dark:border-zinc-700 px-10 py-2 bg-white dark:bg-zinc-900"
+                className="w-full rounded-lg border border-zinc-300 dark:border-zinc-600 pl-12 pr-4 py-3 bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 text-lg font-semibold focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
+                required
               />
             </div>
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">Date</label>
+            <label className="block text-sm font-semibold text-zinc-700 dark:text-zinc-300 mb-2">Date</label>
             <input
               type="date"
               value={transactionDate}
               onChange={(e) => setTransactionDate(e.target.value)}
-              className="w-full rounded-md border border-zinc-200 dark:border-zinc-700 px-3 py-2 bg-white dark:bg-zinc-900"
+              className="w-full rounded-lg border border-zinc-300 dark:border-zinc-600 px-4 py-3 bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
+              required
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">Description (optional)</label>
+            <label className="block text-sm font-semibold text-zinc-700 dark:text-zinc-300 mb-2">Description <span className="text-zinc-400 font-normal">(optional)</span></label>
             <input
               type="text"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              placeholder="Description"
-              className="w-full rounded-md border border-zinc-200 dark:border-zinc-700 px-3 py-2 bg-white dark:bg-zinc-900"
+              placeholder="Add a note..."
+              className="w-full rounded-lg border border-zinc-300 dark:border-zinc-600 px-4 py-3 bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
             />
           </div>
 
-          {error && <p className="text-red-600">{error}</p>}
-
-          <div className="flex items-center space-x-3">
+          <div className="flex items-center gap-3 pt-4">
             <button
               type="submit"
-              disabled={saving}
-              className="inline-flex items-center px-4 py-2 rounded-md bg-indigo-600 text-white disabled:opacity-60"
+              disabled={saving || !categoryId}
+              className="flex-1 px-6 py-3 rounded-lg bg-indigo-600 text-white font-semibold hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-md hover:shadow-lg"
             >
               {saving ? 'Saving…' : 'Save Transaction'}
             </button>
 
-            <button type="button" onClick={() => router.back()} className="text-sm text-zinc-600 dark:text-zinc-300">
+            <button
+              type="button"
+              onClick={() => router.back()}
+              className="px-6 py-3 rounded-lg bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 font-medium hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-all"
+            >
               Cancel
             </button>
           </div>

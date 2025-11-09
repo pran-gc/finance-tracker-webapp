@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { signOut } from '@/lib/clientAuth'
 
 export default function LogoutPage() {
   const router = useRouter()
@@ -12,28 +13,13 @@ export default function LogoutPage() {
 
     ;(async () => {
       try {
-        const gd = await import('@/lib/googleDrive')
-        const sync = await import('@/lib/sync')
-        const db = await import('@/lib/db')
-
-        // Attempt best-effort backup only if we have a valid in-memory token
-        try {
-          if (gd.hasValidAccessToken && gd.hasValidAccessToken()) {
-            setMessage('Backing up to Drive before sign out...')
-            await sync.syncService.backupToDrive()
-          }
-        } catch (err) {
-          console.warn('pre-signout backup failed', err)
-        }
-
-        setMessage('Clearing local data...')
-        try { await gd.signOut() } catch (e) { console.warn('signOut failed', e) }
-        try { await db.clearDB() } catch (e) { console.warn('clearDB failed', e) }
+        setMessage('Signing out...')
+        await signOut()
 
         if (!mounted) return
         router.replace('/login')
       } catch (err) {
-        console.error('Logout flow failed', err)
+        console.error('Logout failed', err)
         router.replace('/login')
       }
     })()
@@ -44,7 +30,8 @@ export default function LogoutPage() {
   return (
     <div className="min-h-screen flex items-center justify-center">
       <div className="text-center p-6">
-        <div className="mb-4">{message}</div>
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-500 mx-auto mb-4"></div>
+        <div className="mb-4 text-zinc-700 dark:text-zinc-300">{message}</div>
         <div className="text-sm text-zinc-500">Redirecting…</div>
       </div>
     </div>

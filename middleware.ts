@@ -23,8 +23,8 @@ export function middleware(req: NextRequest) {
   // Allow public paths
   if (isPublicPath(pathname)) return NextResponse.next()
 
-  const cookie = req.cookies.get('ft_authenticated')
-  const authed = Boolean(cookie && cookie.value === '1')
+  const sessionCookie = req.cookies.get('ft_session')
+  const authed = Boolean(sessionCookie && sessionCookie.value)
 
   // If user is not authenticated, redirect to /login
   if (!authed && pathname !== '/login') {

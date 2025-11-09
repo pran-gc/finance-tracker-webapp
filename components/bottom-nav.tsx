@@ -52,6 +52,24 @@ const links = [
 		),
 	},
 	{
+		label: 'Analytics',
+		href: '/analytics',
+		icon: (
+			<svg
+				viewBox='0 0 15 15'
+				fill='none'
+				xmlns='http://www.w3.org/2000/svg'
+				width='18'
+				height='18'
+			>
+				<path
+					d='M1.5 14.5V.5m0 14h13m-13 0l3-3 3 3 3-4 4 4M1.5.5h1m-1 3h1m-1 3h1m-1 3h1m-1 3h1'
+					stroke='currentColor'
+				/>
+			</svg>
+		),
+	},
+	{
 		label: 'Transactions',
 		href: '/transactions',
 		icon: (

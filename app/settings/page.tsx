@@ -5,172 +5,85 @@ import { useTheme } from 'next-themes'
 import Page from '@/components/page'
 import Section from '@/components/section'
 import { Button } from '@/components/ui/button'
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import dynamic from 'next/dynamic'
 
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
-import { faSignOutAlt, faUser, faShieldAlt, faCog, faBell, faPalette, faCloudUploadAlt } from '@fortawesome/free-solid-svg-icons'
+import { faSignOutAlt, faPalette } from '@fortawesome/free-solid-svg-icons'
 
-import { signOut as clientSignOut, isSignedIn } from '@/lib/googleDrive'
-import { syncService } from '@/lib/sync'
-import { clearDB } from '@/lib/db'
-import { exportSnapshotVisibleFolder } from '@/lib/remoteDb'
-// NOTE: currency modal handles loading/updating currencies client-side
+import { signOut } from '@/lib/clientAuth'
 
 const CurrencyModal = dynamic(() => import('@/components/currency-modal'), { ssr: false })
 
 export default function SettingsPage() {
   const router = useRouter()
   const { theme, setTheme } = useTheme()
+  const [openCurrencyModal, setOpenCurrencyModal] = useState(false)
+  const [signingOut, setSigningOut] = useState(false)
 
   async function handleSignOut() {
+    if (!confirm('Are you sure you want to sign out?')) return
+
+    setSigningOut(true)
     try {
-      // Only attempt final backup if we have a valid in-memory token
-      try {
-        const gd = await import('@/lib/googleDrive')
-        if (gd.hasValidAccessToken && gd.hasValidAccessToken()) {
-          try {
-            await syncService.backupToDrive()
-          } catch (err) {
-            console.warn('Backup before sign-out failed', err)
-          }
-        }
-      } catch (err) {
-        console.warn('skip backup pre-signout', err)
-      }
-
-      // Perform client sign-out
-      await clientSignOut()
-
-      // Clear local DB to minimize leftover local data
-      try {
-        await clearDB()
-      } catch (err) {
-        console.warn('Clearing local DB failed', err)
-      }
-
+      await signOut()
       router.push('/login')
     } catch (err) {
       console.error('Sign out failed', err)
-      router.push('/login')
-    }
-  }
-
-  // Currency modal state (opens client-only modal)
-  const [openCurrencyModal, setOpenCurrencyModal] = useState(false)
-  const [exporting, setExporting] = useState(false)
-
-  async function handleExport() {
-    setExporting(true)
-    try {
-      const signed = await isSignedIn()
-      if (!signed) {
-        router.push('/login')
-        return
-      }
-
-      const fileId = await exportSnapshotVisibleFolder()
-      // Provide simple feedback
-      alert('Exported data to Drive. File ID: ' + fileId)
-    } catch (err) {
-      console.error('Export failed', err)
-      alert('Export failed: ' + (err instanceof Error ? err.message : String(err)))
+      alert('Sign out failed. Please try again.')
     } finally {
-      setExporting(false)
+      setSigningOut(false)
     }
   }
 
   return (
     <Page>
       <Section>
+        <div className="mb-6">
+          <h1 className="text-2xl font-bold text-zinc-900 dark:text-zinc-100">Settings</h1>
+          <p className="text-sm text-zinc-600 dark:text-zinc-400 mt-1">Manage your preferences and account</p>
+        </div>
 
         <div className="space-y-3">
-          <div className="grid gap-3">
+          <div className="grid gap-2">
             <Button
               variant="ghost"
-              className="w-full flex items-center justify-center gap-3 px-3 py-3 text-sm text-zinc-700 dark:text-zinc-300"
+              className="w-full flex items-center justify-start gap-3 px-4 py-3 text-sm text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800"
               onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
             >
               <FontAwesomeIcon icon={faPalette} aria-hidden className="h-5 w-5" />
-              <span className="text-center">{theme === 'dark' ? 'Switch to Light' : 'Switch to Dark'}</span>
-            </Button>
-
-            <Button
-              variant="ghost"
-              className="w-full flex items-center justify-center gap-3 px-3 py-3 text-sm text-zinc-700 dark:text-zinc-300"
-              onClick={() => router.push('/profile')}
-            >
-              <FontAwesomeIcon icon={faUser} aria-hidden className="h-5 w-5" />
-              <span className="text-center">Profile</span>
-            </Button>
-
-            <Button
-              variant="ghost"
-              className="w-full flex items-center justify-center gap-3 px-3 py-3 text-sm text-zinc-700 dark:text-zinc-300"
-              onClick={() => router.push('/security')}
-            >
-              <FontAwesomeIcon icon={faShieldAlt} aria-hidden className="h-5 w-5" />
-              <span className="text-center">Security</span>
+              <span className="flex-1 text-left">{theme === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode'}</span>
             </Button>
 
             <Button
               type="button"
               variant="ghost"
-              className="w-full flex items-center justify-center gap-3 px-3 py-3 text-sm text-zinc-700 dark:text-zinc-300"
-              onClick={() => router.push('/settings/general')}
-            >
-              <FontAwesomeIcon icon={faCog} aria-hidden className="h-5 w-5" />
-              <span className="text-center">General</span>
-            </Button>
-
-            <Button
-              type="button"
-              variant="ghost"
-              className="w-full flex items-center justify-center gap-3 px-3 py-3 text-sm text-zinc-700 dark:text-zinc-300"
-              onClick={() => router.push('/settings/notifications')}
-            >
-              <FontAwesomeIcon icon={faBell} aria-hidden className="h-5 w-5" />
-              <span className="text-center">Notifications</span>
-            </Button>
-
-            <Button
-              type="button"
-              variant="ghost"
-              className="w-full flex items-center justify-center gap-3 px-3 py-3 text-sm text-zinc-700 dark:text-zinc-300"
+              className="w-full flex items-center justify-start gap-3 px-4 py-3 text-sm text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800"
               onClick={() => setOpenCurrencyModal(true)}
             >
-              <FontAwesomeIcon icon={faCog} aria-hidden className="h-5 w-5" />
-              <span className="text-center">Change Currency</span>
+              <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <span className="flex-1 text-left">Change Currency</span>
             </Button>
           </div>
         </div>
       </Section>
+
       {openCurrencyModal && (
         <CurrencyModal open={openCurrencyModal} onClose={() => setOpenCurrencyModal(false)} />
       )}
 
       <div className="mt-auto w-full">
         <div className="p-6 pt-8 w-full">
-          <div className="mb-4" />
-
-          <Button
-            type="button"
-            variant="outline"
-            className="w-full flex items-center justify-center gap-3 px-3 py-3 mb-3"
-            onClick={handleExport}
-            disabled={exporting}
-          >
-            <FontAwesomeIcon icon={faCloudUploadAlt} aria-hidden className="h-5 w-5" />
-            <span className="text-center">{exporting ? 'Exporting...' : 'Export Data'}</span>
-          </Button>
-
           <Button
             variant="destructive"
-            className="w-full flex items-center justify-center gap-3 px-3 py-3"
+            className="w-full flex items-center justify-center gap-3 px-4 py-3"
             onClick={handleSignOut}
+            disabled={signingOut}
           >
             <FontAwesomeIcon icon={faSignOutAlt} aria-hidden className="h-5 w-5" />
-            <span className="text-center">Sign Out</span>
+            <span className="text-center">{signingOut ? 'Signing Out...' : 'Sign Out'}</span>
           </Button>
         </div>
       </div>

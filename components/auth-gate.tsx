@@ -2,6 +2,7 @@
 
 import { useEffect } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
+import { isAuthenticated } from '@/lib/clientAuth'
 
 export default function AuthGate() {
   const router = useRouter()
@@ -12,9 +13,8 @@ export default function AuthGate() {
 
     async function check() {
       try {
-        const auth = await import('@/lib/googleDrive')
-        const signed = await auth.isSignedIn()
-        if (!signed) {
+        const authed = await isAuthenticated()
+        if (!authed) {
           // If not already on /login, redirect there
           if (mounted && pathname !== '/login') {
             router.push('/login')

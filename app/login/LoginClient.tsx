@@ -2,9 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { signIn as clientSignIn } from '@/lib/googleDrive'
-import { syncService } from '@/lib/sync'
-import { driveService } from '@/lib/drive'
+import { signIn } from '@/lib/clientAuth'
 
 export default function LoginClient() {
   const router = useRouter()
@@ -15,65 +13,7 @@ export default function LoginClient() {
     setError(null)
     setLoading(true)
     try {
-      await clientSignIn()
-
-      // After signing in, perform Drive-first restore-or-create logic
-      try {
-        // Look for backup folder
-        let folderId: string | null = null
-        try {
-          folderId = await driveService.findFolder('FinanceTrackerBackups')
-        } catch (err) {
-          console.warn('findFolder failed', err)
-        }
-
-        if (folderId) {
-          // See if there are backup files
-          let files: any[] = []
-          try {
-            files = await driveService.listFiles(`'${folderId}' in parents and name contains 'finance_backup_'`)
-          } catch (err) {
-            console.warn('listFiles failed', err)
-          }
-
-          if (files && files.length > 0) {
-            // Restore the latest backup
-            try {
-              await syncService.restoreFromDrive()
-            } catch (restoreErr) {
-              console.warn('Restore from Drive failed', restoreErr)
-              // fall through to seed+upload
-            }
-          } else {
-            // No backups found — seed local DB and upload an initial backup
-            try {
-              const mod = await import('@/lib/data')
-              await mod.seedCurrencies()
-              await mod.seedCategories()
-              await mod.initializeSettings()
-              await syncService.backupToDrive()
-            } catch (err) {
-              console.warn('seed+backup failed', err)
-            }
-          }
-        } else {
-          // No folder — create it and seed+upload initial backup
-          try {
-            await driveService.createFolder('FinanceTrackerBackups')
-            const mod = await import('@/lib/data')
-            await mod.seedCurrencies()
-            await mod.seedCategories()
-            await mod.initializeSettings()
-            await syncService.backupToDrive()
-          } catch (err) {
-            console.warn('createFolder or seed+backup failed', err)
-          }
-        }
-
-      } catch (err) {
-        console.warn('Drive-first post-signin flow failed', err)
-      }
-
+      await signIn()
       router.push('/')
     } catch (err: any) {
       console.error('Sign in failed', err)
@@ -96,7 +36,7 @@ export default function LoginClient() {
             <div className="w-full max-w-md bg-white/95 dark:bg-zinc-900/95 rounded-xl shadow-lg p-8 flex flex-col justify-between">
               <div>
                 <h1 className="text-2xl font-semibold">Finance Tracker</h1>
-                <p className="text-zinc-600 dark:text-zinc-300 mt-6 text-lg">Smart, private budgeting — sync optionally with Google Drive.</p>
+                <p className="text-zinc-600 dark:text-zinc-300 mt-6 text-lg">Smart, secure budgeting with cloud database sync.</p>
               </div>
 
               <div className="mt-6">
@@ -125,7 +65,7 @@ export default function LoginClient() {
           <div className="lg:hidden min-h-screen flex items-center justify-center">
             <div className="w-full max-w-md bg-white/95 dark:bg-zinc-900/95 rounded-xl shadow-lg p-8 mx-4">
               <h1 className="text-2xl font-semibold">Finance Tracker</h1>
-              <p className="text-zinc-600 dark:text-zinc-300 mt-4">Smart, private budgeting — sync optionally with Google Drive.</p>
+              <p className="text-zinc-600 dark:text-zinc-300 mt-4">Smart, secure budgeting with cloud database sync.</p>
 
               <div className="mt-6">
                 <button

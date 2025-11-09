@@ -1,10 +1,19 @@
 "use client"
 import { useEffect, useState } from "react"
+import { currenciesApi, settingsApi } from "@/lib/api"
+
+interface Currency {
+  id: number
+  code: string
+  name: string
+  symbol: string
+}
 
 export default function CurrencyModal({ open, onClose }: { open: boolean; onClose: () => void }) {
   const [loading, setLoading] = useState(true)
-  const [currencies, setCurrencies] = useState<Array<any>>([])
+  const [currencies, setCurrencies] = useState<Currency[]>([])
   const [selected, setSelected] = useState<number | null>(null)
+  const [saving, setSaving] = useState(false)
 
   useEffect(() => {
     if (!open) return
@@ -12,21 +21,15 @@ export default function CurrencyModal({ open, onClose }: { open: boolean; onClos
     setLoading(true)
     ;(async () => {
       try {
-        const mod = await import("@/lib/data")
-        let cs = await mod.getCurrencies()
-        // If no currencies exist yet, seed defaults then reload
-        if (!cs || cs.length === 0) {
-          try {
-            await mod.seedCurrencies()
-          } catch (err) {
-            console.warn('seeding currencies failed', err)
-          }
-          cs = await mod.getCurrencies()
-        }
-        const settings = await mod.getAppSettings()
+        const [currenciesResponse, settingsResponse] = await Promise.all([
+          currenciesApi.getAll(),
+          settingsApi.get()
+        ])
+
         if (!mounted) return
-  setCurrencies(cs || [])
-  setSelected((settings?.default_currency_id ?? (cs?.[0]?.id ?? null)) as number | null)
+
+        setCurrencies(currenciesResponse.currencies)
+        setSelected(settingsResponse.settings?.default_currency_id ?? currenciesResponse.currencies[0]?.id ?? null)
       } catch (err) {
         console.error("currency modal load failed", err)
       } finally {
@@ -41,15 +44,17 @@ export default function CurrencyModal({ open, onClose }: { open: boolean; onClos
 
   const save = async () => {
     if (selected === null) return
+    setSaving(true)
     try {
-      const mod = await import("@/lib/data")
-      // updateAppSettings expects numbers for ids
-      await mod.updateAppSettings({ default_currency_id: Number(selected) })
-      // notify app
-      window.dispatchEvent(new CustomEvent('finance:data:changed'))
+      await settingsApi.update({ default_currency_id: Number(selected) })
+      // Dispatch event to notify other components that currency changed
+      window.dispatchEvent(new Event('finance:currency:changed'))
       onClose()
     } catch (err) {
       console.error('save currency failed', err)
+      alert('Failed to save currency setting')
+    } finally {
+      setSaving(false)
     }
   }
 
@@ -90,8 +95,12 @@ export default function CurrencyModal({ open, onClose }: { open: boolean; onClos
         </div>
 
         <div className="mt-4 flex justify-end gap-2">
-          <button className="rounded-md px-3 py-1 text-sm" onClick={onClose}>Cancel</button>
-          <button className="rounded-md bg-blue-600 px-3 py-1 text-sm text-white" onClick={save}>Save</button>
+          <button className="rounded-md px-4 py-2 text-sm text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-700" onClick={onClose} disabled={saving}>
+            Cancel
+          </button>
+          <button className="rounded-md bg-indigo-600 px-4 py-2 text-sm text-white hover:bg-indigo-700 disabled:opacity-50" onClick={save} disabled={saving}>
+            {saving ? 'Saving...' : 'Save'}
+          </button>
         </div>
       </div>
     </div>

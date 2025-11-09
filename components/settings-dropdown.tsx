@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { useTheme } from 'next-themes'
 import dynamic from 'next/dynamic'
+import { useCurrency } from '@/contexts/CurrencyContext'
 
 const CurrencyModal = dynamic(() => import('./currency-modal'), { ssr: false })
 
@@ -15,9 +16,9 @@ interface SettingsDropdownProps {
 const SettingsDropdown = ({ isOpen, onClose, user }: SettingsDropdownProps) => {
 	const dropdownRef = useRef<HTMLDivElement>(null)
 	const { theme, setTheme } = useTheme()
+	const { currency } = useCurrency()
 
 	const [openCurrencyModal, setOpenCurrencyModal] = useState(false)
-	const [currencySymbol, setCurrencySymbol] = useState<string | null>(null)
 
 	useEffect(() => {
 		const handleClickOutside = (event: MouseEvent) => {
@@ -34,25 +35,6 @@ const SettingsDropdown = ({ isOpen, onClose, user }: SettingsDropdownProps) => {
 			document.removeEventListener('mousedown', handleClickOutside)
 		}
 	}, [isOpen, onClose])
-
-	useEffect(() => {
-		let mounted = true
-		if (!isOpen) return
-		;(async () => {
-			try {
-				const mod = await import('@/lib/data')
-				const settings = await mod.getAppSettings()
-				const currencies = await mod.getCurrencies()
-				if (!mounted) return
-				const cur = currencies.find((c: any) => c.id === settings?.default_currency_id)
-				setCurrencySymbol(cur?.symbol ?? cur?.code ?? null)
-			} catch (e) {
-				// ignore
-			}
-		})()
-
-		return () => { mounted = false }
-	}, [isOpen])
 
 	return (
 		<>
@@ -89,7 +71,7 @@ const SettingsDropdown = ({ isOpen, onClose, user }: SettingsDropdownProps) => {
 								>
 									<div className='mr-3 flex items-center'>
 										<div className='flex h-6 w-6 items-center justify-center rounded-sm border border-zinc-300 text-sm font-medium dark:border-zinc-700'>
-											{currencySymbol ?? '$'}
+											{currency?.symbol || '$'}
 										</div>
 									</div>
 									<div>Change Currency</div>
@@ -124,69 +106,7 @@ const SettingsDropdown = ({ isOpen, onClose, user }: SettingsDropdownProps) => {
 									{theme === 'dark' ? 'Light Mode' : 'Dark Mode'}
 								</button>
 
-								<button
-									onClick={async () => {
-										console.debug('SettingsDropdown: Sign Out clicked')
-										// sign out flow: try final backup, sign out and clear local DB
-										try {
-											// call client sign out helpers (import dynamically to avoid SSR issues)
-											const mod = await import('@/lib/googleDrive')
-											const sync = await import('@/lib/sync')
-											const db = await import('@/lib/db')
-											try {
-												if (await (mod.isSignedIn?.() ?? false)) {
-													await sync.syncService.backupToDrive()
-												}
-											} catch (e) {
-												console.warn('backup before signout failed', e)
-											}
-											try { await mod.signOut() } catch (e) { console.warn('signOut failed', e) }
-											try { await db.clearDB() } catch (e) { console.warn('clearDB failed', e) }
-											window.location.href = '/'
-										} catch (err) {
-											console.error('Sign out flow failed', err)
-										}
-									}}
-									className='flex w-full items-center rounded-md px-3 py-2 text-sm text-zinc-700 hover:bg-zinc-100 hover:text-zinc-900 dark:text-zinc-300 dark:hover:bg-zinc-700 dark:hover:text-zinc-100'
-								>
-									<svg
-										className='mr-3 h-4 w-4'
-										fill='none'
-										stroke='currentColor'
-										viewBox='0 0 24 24'
-									>
-										<path
-											strokeLinecap='round'
-											strokeLinejoin='round'
-											strokeWidth={2}
-											d='M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z'
-										/>
-									</svg>
-									Account Settings
-								</button>
-
-								<button
-									onClick={async () => {
-										try {
-											const mod = await import('@/lib/googleDrive')
-											const sync = await import('@/lib/sync')
-											const db = await import('@/lib/db')
-											try {
-												// Only attempt a final backup if we have a valid in-memory token
-												if (mod.hasValidAccessToken && mod.hasValidAccessToken()) {
-													await sync.syncService.backupToDrive()
-												}
-											} catch (e) {
-												console.warn('backup before signout failed', e)
-											}
-											try { await mod.signOut() } catch (e) { console.warn('signOut failed', e) }
-											try { await db.clearDB() } catch (e) { console.warn('clearDB failed', e) }
-											window.location.href = '/login'
-										} catch (err) {
-											console.error('Sign out flow failed', err)
-										}
-									}}
-									className='flex w-full items-center rounded-md px-3 py-2 text-sm text-zinc-700 hover:bg-zinc-100 hover:text-zinc-900 dark:text-zinc-300 dark:hover:bg-zinc-700 dark:hover:text-zinc-100'>
+								<a href='/settings'className='flex w-full items-center rounded-md px-3 py-2 text-sm text-zinc-700 hover:bg-zinc-100 hover:text-zinc-900 dark:text-zinc-300 dark:hover:bg-zinc-700 dark:hover:text-zinc-100'>
 									<svg
 										className='mr-3 h-4 w-4'
 										fill='none'
@@ -201,8 +121,8 @@ const SettingsDropdown = ({ isOpen, onClose, user }: SettingsDropdownProps) => {
 										/>
 										<path strokeLinecap='round' strokeLinejoin='round' strokeWidth={2} d='M15 12a3 3 0 11-6 0 3 3 0 016 0z' />
 									</svg>
-									App Settings
-								</button>
+									Settings
+								</a>
 
 								<hr className='my-2 border-zinc-200 dark:border-zinc-700' />
 								<a href='/logout' className=''>
