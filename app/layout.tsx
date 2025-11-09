@@ -22,7 +22,7 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "Finance Tracker",
-  description: "Track your finances locally and sync with Google Drive",
+  description: "Track your finances with a powerful web app",
   manifest: "/manifest.json",
   viewport: {
     width: 'device-width',

@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Page from '../components/page';
 import Section from '../components/section';
-import { transactionsApi, analyticsApi } from '@/lib/api';
+import { transactionsApi, analyticsApi, settingsApi } from '@/lib/api';
 import { useCurrency } from '@/contexts/CurrencyContext';
 
 interface Transaction {
@@ -25,6 +25,8 @@ export default function Home() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [summary, setSummary] = useState({ income: 0, expense: 0 });
   const [error, setError] = useState<string | null>(null);
+  const [isHidden, setIsHidden] = useState(false);
+  const [togglingHidden, setTogglingHidden] = useState(false);
 
   useEffect(() => {
     async function loadDashboard() {
@@ -37,14 +39,16 @@ export default function Home() {
         const startDate = startOfMonth.toISOString().split('T')[0];
         const endDate = endOfMonth.toISOString().split('T')[0];
 
-        // Load recent transactions and analytics in parallel
-        const [txResponse, analyticsResponse] = await Promise.all([
-          transactionsApi.getAll(10, 0),
-          analyticsApi.get(startDate, endDate)
+        // Load recent transactions (only 3), analytics, and settings in parallel
+        const [txResponse, analyticsResponse, settingsResponse] = await Promise.all([
+          transactionsApi.getAll(3, 0),
+          analyticsApi.get(startDate, endDate),
+          settingsApi.get()
         ]);
 
         setTransactions(txResponse.transactions);
         setSummary(analyticsResponse.summary);
+        setIsHidden(settingsResponse.settings?.is_hidden || false);
       } catch (err: any) {
         console.error('Failed to load dashboard:', err);
         if (err.message?.includes('Unauthorized')) {
@@ -71,6 +75,19 @@ export default function Home() {
       window.removeEventListener('finance:currency:changed', handleCurrencyChange);
     };
   }, [router]);
+
+  const toggleHidden = async () => {
+    try {
+      setTogglingHidden(true);
+      const newHiddenState = !isHidden;
+      await settingsApi.update({ is_hidden: newHiddenState });
+      setIsHidden(newHiddenState);
+    } catch (err) {
+      console.error('Failed to toggle hidden state:', err);
+    } finally {
+      setTogglingHidden(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -103,33 +120,58 @@ export default function Home() {
 
   const balance = summary.income - summary.expense;
 
+  // Helper function to mask amounts
+  const maskAmount = (amount: number) => {
+    if (isHidden) return '***';
+    return `${currency?.symbol || '$'}${amount.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+  };
+
   return (
     <Page>
       <Section>
-        <h2 className='text-xl font-semibold text-zinc-800 dark:text-zinc-200 mb-4'>
-          Dashboard
-        </h2>
+        <div className='flex items-center justify-between mb-4'>
+          <h2 className='text-xl font-semibold text-zinc-800 dark:text-zinc-200'>
+            Dashboard
+          </h2>
+          <button
+            onClick={toggleHidden}
+            disabled={togglingHidden}
+            className='p-2 rounded-md hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors'
+            title={isHidden ? 'Show amounts' : 'Hide amounts'}
+          >
+            {isHidden ? (
+              <svg className='w-5 h-5 text-zinc-600 dark:text-zinc-400' fill='none' stroke='currentColor' viewBox='0 0 24 24'>
+                <path strokeLinecap='round' strokeLinejoin='round' strokeWidth={2} d='M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21' />
+              </svg>
+            ) : (
+              <svg className='w-5 h-5 text-zinc-600 dark:text-zinc-400' fill='none' stroke='currentColor' viewBox='0 0 24 24'>
+                <path strokeLinecap='round' strokeLinejoin='round' strokeWidth={2} d='M15 12a3 3 0 11-6 0 3 3 0 016 0z' />
+                <path strokeLinecap='round' strokeLinejoin='round' strokeWidth={2} d='M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z' />
+              </svg>
+            )}
+          </button>
+        </div>
 
         {/* Summary Cards */}
         <div className='grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6'>
           <div className='p-4 border border-zinc-200 dark:border-zinc-700 rounded-lg bg-gradient-to-br from-green-50 to-green-100 dark:from-green-900/20 dark:to-green-800/20'>
             <p className='text-sm text-zinc-600 dark:text-zinc-400 mb-1'>Income (This Month)</p>
             <p className='text-2xl font-bold text-green-600 dark:text-green-400'>
-              {currency?.symbol || '$'}{summary.income.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}
+              {maskAmount(summary.income)}
             </p>
           </div>
 
           <div className='p-4 border border-zinc-200 dark:border-zinc-700 rounded-lg bg-gradient-to-br from-red-50 to-red-100 dark:from-red-900/20 dark:to-red-800/20'>
             <p className='text-sm text-zinc-600 dark:text-zinc-400 mb-1'>Expenses (This Month)</p>
             <p className='text-2xl font-bold text-red-600 dark:text-red-400'>
-              {currency?.symbol || '$'}{summary.expense.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}
+              {maskAmount(summary.expense)}
             </p>
           </div>
 
           <div className={`p-4 border border-zinc-200 dark:border-zinc-700 rounded-lg ${balance >= 0 ? 'bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-900/20 dark:to-blue-800/20' : 'bg-gradient-to-br from-orange-50 to-orange-100 dark:from-orange-900/20 dark:to-orange-800/20'}`}>
             <p className='text-sm text-zinc-600 dark:text-zinc-400 mb-1'>Balance</p>
             <p className={`text-2xl font-bold ${balance >= 0 ? 'text-blue-600 dark:text-blue-400' : 'text-orange-600 dark:text-orange-400'}`}>
-              {currency?.symbol || '$'}{Math.abs(balance).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}
+              {maskAmount(Math.abs(balance))}
             </p>
           </div>
         </div>
@@ -160,7 +202,7 @@ export default function Home() {
                     <div className='text-xs text-zinc-500 mt-1'>{new Date(t.transaction_date).toLocaleDateString()}</div>
                   </div>
                   <div className={`font-semibold text-lg ${t.type === 'expense' ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'}`}>
-                    {t.type === 'expense' ? '-' : '+'}{t.currency_symbol}{Number(t.amount).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}
+                    {isHidden ? '***' : `${t.type === 'expense' ? '-' : '+'}${t.currency_symbol}${Number(t.amount).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`}
                   </div>
                 </div>
               ))}

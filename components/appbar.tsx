@@ -5,6 +5,7 @@ import SettingsDropdown from './settings-dropdown'
 
 const links = [
 	{ label: 'Dashboard', href: '/' },
+	{ label: 'Analytics', href: '/analytics' },
 	{ label: 'Transactions', href: '/transactions' },
 ]
 

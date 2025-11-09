@@ -31,7 +31,7 @@ export default function AddTransactionPage() {
 
     async function prepare() {
       try {
-        // Load categories and settings in parallel
+        // Load all categories and settings at once (no refetch on type change)
         const [categoriesResponse, settingsResponse] = await Promise.all([
           categoriesApi.getAll(),
           settingsApi.get()
@@ -67,7 +67,7 @@ export default function AddTransactionPage() {
     return () => {
       mounted = false
     }
-  }, [router, type])
+  }, [router]) // Removed 'type' dependency - only load once
 
   // Update visible categories whenever the selected type changes
   useEffect(() => {

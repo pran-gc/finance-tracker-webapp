@@ -24,16 +24,20 @@ export default function LoginClient() {
   }
 
   return (
-    <div
-      className="min-h-screen bg-cover bg-center flex items-center"
-      style={{ backgroundImage: "url('/financeapp.jpg')" }}
-    >
-      <div className="w-full">
+    <div className="min-h-screen relative flex items-center overflow-hidden bg-zinc-100 dark:bg-zinc-900">
+      {/* Background Image */}
+      <img
+        src="/images/financeapp.jpg"
+        alt="Finance background"
+        className="absolute inset-0 w-full h-full object-cover"
+      />
+
+      <div className="w-full relative z-10">
         <div className="mx-auto max-w-screen-lg px-6">
           <div className="hidden lg:flex h-[80vh] items-stretch">
             <div className="flex-1" />
 
-            <div className="w-full max-w-md bg-white/95 dark:bg-zinc-900/95 rounded-xl shadow-lg p-8 flex flex-col justify-between">
+            <div className="w-full max-w-md bg-white/90 dark:bg-zinc-900/90 backdrop-blur-md rounded-2xl shadow-2xl p-8 flex flex-col justify-between border border-white/30 dark:border-white/10">
               <div>
                 <h1 className="text-2xl font-semibold">Finance Tracker</h1>
                 <p className="text-zinc-600 dark:text-zinc-300 mt-6 text-lg">Smart, secure budgeting with cloud database sync.</p>
@@ -63,7 +67,7 @@ export default function LoginClient() {
           </div>
 
           <div className="lg:hidden min-h-screen flex items-center justify-center">
-            <div className="w-full max-w-md bg-white/95 dark:bg-zinc-900/95 rounded-xl shadow-lg p-8 mx-4">
+            <div className="w-full max-w-md bg-white/90 dark:bg-zinc-900/90 backdrop-blur-md rounded-2xl shadow-2xl p-8 mx-4 border border-white/30 dark:border-white/10">
               <h1 className="text-2xl font-semibold">Finance Tracker</h1>
               <p className="text-zinc-600 dark:text-zinc-300 mt-4">Smart, secure budgeting with cloud database sync.</p>
 

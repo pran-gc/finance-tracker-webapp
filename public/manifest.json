@@ -1,7 +1,7 @@
 {
-	"name": "Rice Bowl",
-	"short_name": "Rice Bowl",
-	"description": "Fluffless jasmine rice for those cold winter nights",
+	"name": "Finance Tracker",
+	"short_name": "Finance Tracker",
+	"description": "Track your finances with a powerful web app",
 	"icons": [
 		{
 			"src": "/images/icon-192.png",

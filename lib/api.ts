@@ -139,7 +139,7 @@ export const settingsApi = {
     return apiCall('/settings')
   },
 
-  async update(data: { default_currency_id: number }) {
+  async update(data: { default_currency_id?: number; is_hidden?: boolean }) {
     return apiCall('/settings', {
       method: 'PUT',
       body: JSON.stringify(data),

@@ -81,7 +81,8 @@ export default function AnalyticsPage() {
   useEffect(() => {
     async function loadAnalytics() {
       try {
-        setLoading(true)
+        // Keep existing data visible while loading new data (no flash)
+        if (!data) setLoading(true)
         setError(null)
         const { start, end } = getDateRange(period)
         const response = await analyticsApi.getDetailed(start, end)

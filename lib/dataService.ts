@@ -34,6 +34,7 @@ export interface AppSettings {
   id: number
   user_id: number
   default_currency_id: number
+  is_hidden: boolean
   last_backup_time: Date | null
   created_at: Date
   updated_at: Date
@@ -191,7 +192,7 @@ export async function deleteTransaction(userId: number, id: number): Promise<voi
 // App settings operations
 export async function getAppSettings(userId: number): Promise<AppSettings | null> {
   const settings = await query<AppSettings[]>(
-    'SELECT id, user_id, default_currency_id, last_backup_time, created_at, updated_at FROM app_settings WHERE user_id = ?',
+    'SELECT id, user_id, default_currency_id, is_hidden, last_backup_time, created_at, updated_at FROM app_settings WHERE user_id = ?',
     [userId]
   )
   return settings.length > 0 ? settings[0] : null
@@ -207,10 +208,17 @@ export async function updateAppSettings(userId: number, defaultCurrencyId: numbe
     )
   } else {
     await query(
-      'INSERT INTO app_settings (user_id, default_currency_id) VALUES (?, ?)',
+      'INSERT INTO app_settings (user_id, default_currency_id, is_hidden) VALUES (?, ?, FALSE)',
       [userId, defaultCurrencyId]
     )
   }
+}
+
+export async function toggleHiddenSettings(userId: number, isHidden: boolean): Promise<void> {
+  await query(
+    'UPDATE app_settings SET is_hidden = ? WHERE user_id = ?',
+    [isHidden, userId]
+  )
 }
 
 export async function getDefaultCurrency(userId: number): Promise<Currency | null> {
